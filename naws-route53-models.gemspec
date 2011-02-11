@@ -13,6 +13,7 @@ Gem::Specification.new do |s|
   s.description = %q{ActiveModel models for NAWS Route53 implementation}
 
   s.rubyforge_project = "naws-route53-models"
+  s.add_dependency 'activemodel'
 
   s.files         = `git ls-files`.split("\n")
   s.test_files    = `git ls-files -- {test,spec,features}/*`.split("\n")
