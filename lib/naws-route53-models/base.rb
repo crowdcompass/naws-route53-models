@@ -12,6 +12,7 @@ class Naws::Route53::Models::Base
 
   def self.inherited(by)
     by.send(:extend, ActiveModel::Naming)
+    by.send(:include, ActiveModel::Dirty)
     by.send(:extend, ClassMethods)
   end
 
@@ -25,8 +26,11 @@ class Naws::Route53::Models::Base
   end
 
   def reload
+    @reloading = true
     response = @context.execute_request build_get_request
     populate_from_response(response)
+    @reloading = false
+    self
   end
 
   def new_record?
@@ -59,18 +63,42 @@ class Naws::Route53::Models::Base
     "#<#{self.class} #{attributes_as_nice_string}>"
   end
 
+  def attributes
+    self.class.attributes.inject({}) do |c,i|
+      c[i] = send(i)
+      c
+    end
+  end
+
+  def write_attribute(name, value)
+    instance_variable_set("@#{name}", value)
+  end
+
+  def write_attributes(hash)
+    hash.each do |key, val|
+      write_attribute key, val
+    end
+  end
+
+  def read_attribute(name)
+    instance_variable_set("@#{name}")
+  end
+
   module ClassMethods
     
     attr_accessor :mutable_attributes, :immutable_attributes
 
     def attributes
-      (mutable_attributes || []) + (immutable_attributes + [])
+      (mutable_attributes || []) + (immutable_attributes || [])
     end
 
     def all_with_context(context, options = {})
-      response = context.execute_request build_list_request(context)
-      response.hosted_zones.map do |hosted_zone|
-        new(hosted_zone)
+      response = context.execute_request build_list_request(context, options)
+      response.collection_items.map do |collection_item|
+        n = new
+        n.write_attributes(collection_item)
+        n.send(:after_list_build, collection_item, options)
+        n
       end
     end
 
@@ -102,8 +130,20 @@ class Naws::Route53::Models::Base
 
     protected
 
-    def build_list_request(context)
+    def build_list_request(context, options)
       raise NotImplementedError, "This model does not support list operations"
+    end
+
+    def model_attributes(*a)
+      define_attribute_methods a
+      a.each do |attr|
+        ivar = :"@#{attr}"
+        attr_reader attr
+        define_method("#{attr}=") do |val|
+          send("#{attr}_will_change!") unless val == instance_variable_get(ivar)
+          instance_variable_set(ivar, val)
+        end
+      end
     end
 
   end
@@ -117,8 +157,9 @@ class Naws::Route53::Models::Base
     def populate_from_response(response, type = :get)
       @response = response
       self.class.attributes.each do |attr| 
-        self.send("#{attr}=", response.send(attr)) if response.respond_to?(attr)
+        write_attribute(attr, response.send(attr)) if response.respond_to?(attr)
       end
+      reset_changes
       self
     end
 
@@ -130,6 +171,7 @@ class Naws::Route53::Models::Base
 
     def update_record
       @context.execute_request build_update_request
+      reset_changes
       self
     end
 
@@ -137,7 +179,6 @@ class Naws::Route53::Models::Base
       @context.execute_request build_delete_request
       self
     end
-
     
     def build_get_request
       raise NotImplementedError, "This model does not support get operations"
@@ -155,4 +196,12 @@ class Naws::Route53::Models::Base
       raise NotImplementedError, "This model does not support delete operations"
     end
 
+    def after_list_build(attrs, options)
+      # override
+    end
+
+    def reset_changes
+      @previously_changed = changes
+      @changed_attributes.clear
+    end
 end

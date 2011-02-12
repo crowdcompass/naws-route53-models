@@ -1,17 +1,18 @@
 require 'naws-route53-models/base'
+require 'naws-route53-models/record_set'
 
 class Naws::Route53::Models::HostedZone < Naws::Route53::Models::Base
 
   self.mutable_attributes = %w[name caller_reference comment]
   self.immutable_attributes = %w[name_servers]
 
-  attr_accessor *attributes
+  model_attributes *attributes
 
   validates_presence_of :name, :caller_reference
 
   def name_servers
     # The list API doesn't provide nameservers :(
-    if @name_servers.nil? and !new_record?
+    if @name_servers.nil? and !new_record? and !@reloading
       reload
       @name_servers
     else
@@ -19,9 +20,17 @@ class Naws::Route53::Models::HostedZone < Naws::Route53::Models::Base
     end
   end
 
+  def record_sets
+    Naws::Route53::Models::RecordSet.all(:zone_id => id)
+  end
+
+  def change_record_sets(changes)
+    @context.execute :change_resource_record_sets, :zone_id => id, :changes => changes
+  end
+
   protected
   
-    def self.build_list_request(context)
+    def self.build_list_request(context, options)
       Naws::Route53::ListHostedZonesRequest.new(context)
     end
 
