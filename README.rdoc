@@ -1,0 +1,53 @@
+= Naws::Route53::Models
+== A somewhat more lush interface to AWS Route 53
+
+This gem is still under development. It relies on 
+naws-route53[http://github.com/mboeh/naws]. While naws-route53 is a very thin
+layer on top of the underlying API, this gem implements an
+ActiveModel-compatible, ActiveRecord-style interface on top of that.
+
+Things which I currently don't have that I intend to soon:
+
+* Domain-based lookup, which will have to function by doing a list request and
+extracting the appropriate record.
+* ActiveRecord-style association between HostedZone and RecordSet.
+* Transactions for RecordSet (the underlying API is transactional).
+
+More specs and documentation are coming soon. This gem is not ready for
+production use, but I welcome any input.
+
+=== Example
+
+  Naws::Route53::Models.initialize_context(
+    :access_key_id => "YOUR_AWS_KEY_ID",
+    :secret_access_key => "YOUR_AWS_SECRET_KEY",
+    :transport => :net_http
+  )
+
+  # This is basically what find_by_name is going to have to do.
+  zone = Naws::Route53::Models::HostedZone.all.detect {|z|
+    z.name == "example.com."
+  }
+
+  zone.name_servers # => ["ns-468.awsdns-58.com", ...]
+
+  # And this will be smoothed over with association sugar.
+  rec = Naws::Route53::Models::RecordSet.new(
+    :zone_id => z.id,
+    :name => "example.com.",
+    :type => "MX",
+    :records => ["0 mail.example.com.", "10 mail2.example.com."]
+  )
+  rec.save
+
+  rec2 = zone.record_sets.detect{|rs|
+    rs.type == "MX"
+  }
+  rec2.records # => ["0 mail.example.com.", "10 mail2.example.com."]
+
+  # And you can do
+  # % dig @ns-468.awsdns-58.com mx example.com
+  # And it'll show up. Route 53 requests are asynchronous on Amazon's end -- you
+  # get back a change ticket (which this API doesn't currently track). In my
+  # testing, though, changes have propagated within their network within moments
+  # every time.
