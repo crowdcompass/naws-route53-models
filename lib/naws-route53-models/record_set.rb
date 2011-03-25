@@ -35,6 +35,10 @@ class Naws::Route53::Models::RecordSet < Naws::Route53::Models::Base
 
   model_attributes *attributes
 
+  def new_record?
+    @id.type.nil?
+  end
+
   protected
 
     def self.build_list_request(context, options)

@@ -21,7 +21,7 @@ class Naws::Route53::Models::HostedZone < Naws::Route53::Models::Base
   end
 
   def record_sets
-    Naws::Route53::Models::RecordSet.all(:zone_id => id)
+    Naws::Route53::Models::RecordSet.all_with_context(context, :zone_id => id)
   end
 
   def change_record_sets(changes)

@@ -9,8 +9,6 @@ module Naws
           @context = Naws::Route53::Context.new(*args)
         end
       end
-
-      UpdatesNotPermitted = Naws::NawsError.build("It is not possible to update existing records with the Route53 API")
     end
   end
 end

@@ -95,7 +95,7 @@ class Naws::Route53::Models::Base
     def all_with_context(context, options = {})
       response = context.execute_request build_list_request(context, options)
       response.collection_items.map do |collection_item|
-        n = new
+        n = new_with_context(context)
         n.write_attributes(collection_item)
         n.send(:after_list_build, collection_item, options)
         n
@@ -139,6 +139,7 @@ class Naws::Route53::Models::Base
       a.each do |attr|
         ivar = :"@#{attr}"
         attr_reader attr
+        public attr
         define_method("#{attr}=") do |val|
           send("#{attr}_will_change!") unless val == instance_variable_get(ivar)
           instance_variable_set(ivar, val)
