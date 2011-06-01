@@ -93,12 +93,18 @@ class Naws::Route53::Models::Base
     end
 
     def all_with_context(context, options = {})
-      response = context.execute_request build_list_request(context, options)
-      response.collection_items.map do |collection_item|
-        n = new_with_context(context)
-        n.write_attributes(collection_item)
-        n.send(:after_list_build, collection_item, options)
-        n
+      [].tap do |result_items|
+        loop do
+          response = context.execute_request build_list_request(context, options)
+          response.collection_items.each do |collection_item|
+            n = new_with_context(context)
+            n.write_attributes(collection_item)
+            n.send(:after_list_build, collection_item, options)
+            result_items << n
+          end
+          break unless response.is_truncated?
+          options = options.merge(response.next_item_offset)
+        end
       end
     end
 
